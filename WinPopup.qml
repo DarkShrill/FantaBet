@@ -9,10 +9,11 @@ Popup {
     focus: true
     dim: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+    width: Math.min(420, parent.width - 40)
+    height: 280
     x: (parent.width  - width)  / 2
     y: (parent.height - height) / 2
-    width: Math.min(420, parent.width - 40)
-    height: 120
 
     background: Rectangle {
         radius: 14
