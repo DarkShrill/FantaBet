@@ -1,0 +1,16 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>IconButton.qml</file>
+        <file>man-with-money.png</file>
+        <file>worker-money-time.png</file>
+        <file>MasterPages/MasterWaitingRoomPage.qml</file>
+        <file>SlavePages/SlaveHowAreYouPage.qml</file>
+        <file>PlayerCard.qml</file>
+        <file>avatar.png</file>
+        <file>CustomButton.qml</file>
+        <file>SubPage.qml</file>
+        <file>MasterPages/MasterHomePage.qml</file>
+        <file>WinPopup.qml</file>
+    </qresource>
+</RCC>
