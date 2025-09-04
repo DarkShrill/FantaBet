@@ -7,14 +7,33 @@ import QtQml 2.12
 
 import "qrc:/"
 import App 1.0
-
+import Network 1.0
 
 Page {
     id: root
     property var playersModel: Players       // <-- inietta qui il tuo modello C++
     signal startRequested()
+    property var masterHomePageInstance: null
 
     background: Rectangle { color: "#101417" }//
+
+    UdpMaster {
+        id: master
+
+        onPeopleReceived: {
+            for (var i = 0; i < payload.length; ++i) {
+                var p = payload[i]
+                Players.appendMimimal(p.firstName, p.lastName, p.photo, unique_id)
+            }
+        }
+
+        onBidReceived: {
+            if(checkRunning())
+                Bids.appendBid(who, amount, (new Date()).getTime())
+        }
+
+//        onSen
+    }
 
     // Mock locale (solo per preview se non hai ancora il modello C++)
     ListModel {
@@ -124,10 +143,10 @@ Page {
             spacing: 0
             CustomButton{
                 buttonText: "Avanti"
-
+                buttonEnabled: peopleCount > 0
                 onClicked: {
                     // apri una sottopagina
-                    masterStack.push(Qt.resolvedUrl("MasterHomePage.qml"), {
+                    masterHomePageInstance = masterStack.push(Qt.resolvedUrl("MasterHomePage.qml"), {
                         someParam: 123,
                         pageTitle: "Dettagli"
                     })
@@ -135,5 +154,12 @@ Page {
             }
         }
         Item { Layout.fillWidth: true; height: 16 } // spacer
+    }
+
+    function checkRunning(){
+        if(masterHomePageInstance){
+            return masterHomePageInstance.running
+        }
+        return false;
     }
 }

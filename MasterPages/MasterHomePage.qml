@@ -8,21 +8,15 @@ import App 1.0
 import "qrc:/"
 
 Page {
-    id: root
+    id: homePage
     background: Rectangle { color: "#0f1921" }
 
     /* ====== Props ====== */
-    property string  playerName: "Nome giocatore"
-    property int     maxSeconds: 5                // <-- 5 secondi
+    property string  playerName: ""
+    property int     maxSeconds: 5
     property real    timeLeft:   maxSeconds
     property bool    running:    false
     property string  currency:   "€"
-
-    // ultima puntata (il modello inserisce in testa → riga 0)
-    readonly property var lastBid: (bidsModel && bidsModel.count > 0) ? bidsModel.get(0) : null
-    readonly property string lastWho: lastBid ? lastBid.who   : qsTr("—")
-    readonly property int    lastTotal: lastBid ? lastBid.total : 0
-
 
     // Modello C++ (iniettalo dall’esterno: es. context property "BidsModel")
     property var bidsModel: Bids
@@ -30,55 +24,139 @@ Page {
     signal roundStarted(string player)
     signal roundEnded(string player, int finalBid)
 
-    WinPopup{
-        id:winPopup
+    // ultima puntata (il modello inserisce in testa → riga 0)
+    readonly property var    lastBid:   (bidsModel && bidsModel.count > 0) ? bidsModel.get(0) : null
+    readonly property string lastWho:   lastBid ? lastBid.who   : qsTr("—")
+    readonly property int    lastTotal: lastBid ? lastBid.total : 0
+
+    /* ====== Funzioni ====== */
+    function startCountdown(resetToMax) {
+        if (resetToMax === undefined) resetToMax = true
+        countdownAnim.stop()
+        if (resetToMax) {
+            homePage.timeLeft = homePage.maxSeconds
+        }
+        countdownAnim.from = homePage.timeLeft
+        countdownAnim.to = 0
+        countdownAnim.duration = Math.max(1, homePage.timeLeft * 1000) // ms
+        pulse.start()
+        countdownAnim.start()
+        homePage.running = true
+        homePage.roundStarted(homePage.playerName)
     }
 
-    /* ====== Timer ====== */
-    Timer {
-        id: t
-        interval: 100; repeat: true; running: root.running
-        onTriggered: {
-            root.timeLeft = Math.max(0, root.timeLeft - 0.1)
-            if (root.timeLeft === 0) {
-                root.running = false
+    function pauseCountdown() {
+        if (countdownAnim.running) {
+            countdownAnim.pause()
+        }
+        homePage.running = false
+    }
+
+    function resumeCountdown() {
+        if (countdownAnim.paused) {
+            countdownAnim.resume()
+            homePage.running = true
+        } else if (!countdownAnim.running && homePage.timeLeft > 0) {
+            // safety: riparte da dove era
+            startCountdown(false)
+        }
+    }
+
+    function stopCountdownToEnd() {
+        countdownAnim.stop()
+        homePage.timeLeft = 0
+        homePage.running = false
+        winPopup.open()
+        homePage.roundEnded(homePage.playerName, currentTotal)
+    }
+
+    /* ====== Animazione countdown ====== */
+    NumberAnimation {
+        id: countdownAnim
+        target: homePage
+        property: "timeLeft"
+        from: homePage.maxSeconds
+        to: 0
+        duration: homePage.maxSeconds * 1000
+        easing.type: Easing.Linear
+
+        // Se fermata naturalmente → fine round
+        onStopped: {
+            // se si è fermata perché ha finito (non per pausa)
+            if (!countdownAnim.paused && homePage.timeLeft <= 0.001) {
+                homePage.running = false
                 winPopup.open()
-                root.roundEnded(root.playerName, currentTotal)
+                if(lastBid.photo !== ""){
+                    celebration.celebrate(lastBid.photo, 2000)
+                }
+                homePage.roundEnded(homePage.playerName, currentTotal)
             }
         }
     }
 
-    /* Totale corrente (se il modello fornisce "total", uso l'ultima riga; altrimenti sommo i delta) */
+    WinPopup {
+        id: winPopup
+        onNewRoundClicked: function () {
+            homePage.timeLeft = homePage.maxSeconds
+            homePage.running = false
+            choosePlayerPopup.open()
+        }
+    }
+
+    CelebrationPopup {
+        id: celebration
+        onFinished: {
+        }
+    }
+
+    ChoosePlayerPopup {
+        id: choosePlayerPopup
+        onAccepted: function(n) {
+            homePage.playerName = n || ""     // evita undefined
+            homePage.timeLeft = homePage.maxSeconds
+            homePage.running = false
+            if (bidsModel && bidsModel.clear) bidsModel.clear()  // usa l’istanza
+            choosePlayerPopup.close()
+        }
+    }
+
+    /* Totale corrente (se il modello fornisce "total", uso l'ultima riga; altrimenti sommo i amount) */
     readonly property int currentTotal: {
         if (!bidsModel || !bidsModel.count) return 0
-        var row0 = 0 // mostro ordine: più recente in alto
+        var row0 = 0 // più recente in alto
         var itm = bidsModel.get ? bidsModel.get(row0) : null
         if (itm && itm.total !== undefined) return itm.total
-        // fallback: somma i delta
         var s = 0
-        for (var i=0;i<bidsModel.count;i++) {
+        for (var i = 0; i < bidsModel.count; i++) {
             var it = bidsModel.get(i)
-            if (it && it.delta !== undefined) s += it.delta
+            if (it && it.amount !== undefined) s += it.amount
         }
         return s
     }
 
-    /* Reset timer su nuova puntata */
+    /* Reset/Start su nuova puntata dal C++ */
     Connections {
         target: bidsModel
         ignoreUnknownSignals: true
+
         onRowsInserted: {
-            // nuova bid aggiunta dal C++ → reset timer e pulse
-            root.timeLeft = root.maxSeconds
-            root.running = true
-            pulse.start()
-            ring.requestPaint()
+            // nuova bid → reset e riparti
+            homePage.timeLeft = homePage.maxSeconds
+            circle.requestPaint()
+            startCountdown(true)
         }
-        // opzionale: su model reset
+
         onModelReset: {
-            root.timeLeft = root.maxSeconds
-            root.running = false
-            ring.requestPaint()
+            homePage.timeLeft = homePage.maxSeconds
+            homePage.running = false
+            circle.requestPaint()
+        }
+    }
+
+    // Quando questa Page diventa attiva nello StackView
+    StackView.onStatusChanged: {
+        if (StackView.status === StackView.Active) {
+            choosePlayerPopup.open()
         }
     }
 
@@ -92,30 +170,50 @@ Page {
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
+
             Label {
                 text: qsTr("Puntata per")
-                color: "#b5c9d8"; font.pixelSize: 18
+                color: "#b5c9d8"
+                font.pixelSize: 18
+                Layout.alignment: Qt.AlignVCenter
             }
+
+            // --- chip col nome ---
             Rectangle {
-                radius: 8; color: "white"
-                height: titleLbl.implicitHeight + 8
-                width: Math.min(titleLbl.implicitWidth + 18, parent.width * 0.6)
+                id: playerChip
+                radius: 8
+                color: "white"
+
+                // Usa implicit size così RowLayout non lo schiaccia a 0
+                implicitHeight: titleLbl.implicitHeight + 8
+                implicitWidth:  titleLbl.implicitWidth  + 18
+
+                // Limiti di layout (ok tenerli)
+                Layout.maximumWidth: homePage.width * 0.6
+                Layout.alignment: Qt.AlignVCenter
+
+                // Se vuoi evitare “sparizioni” quando la stringa è momentaneamente vuota:
+                Layout.minimumWidth: 80  // o quello che preferisci
+
+                // Mostralo solo se c’è un nome
+                visible: homePage.playerName && homePage.playerName.length > 0
+
                 Label {
                     id: titleLbl
-                    anchors.centerIn: parent
-                    text: root.playerName
-                    color: "black"; font.pixelSize: 18; font.bold: true
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    text: homePage.playerName
+                    color: "black"
+                    font.pixelSize: 18
+                    font.bold: true
                     elide: Text.ElideRight
+                    wrapMode: Text.NoWrap        // importante: niente a capo, solo elide
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
             }
+
             Item { Layout.fillWidth: true }
-            /*
-            Label {
-                text: qsTr("Rimasti: ") + Math.ceil(root.timeLeft) + "s"
-                color: root.running ? "#7FD1FF" : "#89a3b4"
-                font.pixelSize: 16
-            }
-            */
         }
 
         RowLayout {
@@ -135,8 +233,9 @@ Page {
                 Rectangle {
                     id: pulse
                     anchors.centerIn: parent
-                    width: parent.size; height: width; radius: width/2
+                    width: parent.size; height: width; radius: width / 2
                     color: "#2ecc71"; opacity: 0; scale: 0.9
+
                     SequentialAnimation on opacity {
                         id: pulseAnim
                         running: false
@@ -150,70 +249,93 @@ Page {
                 }
 
                 Connections {
-                    target: root
-                    onTimeLeftChanged: ring.requestPaint()
-                    onRunningChanged:  ring.requestPaint()
+                    target: homePage
+                    onTimeLeftChanged: circle.requestPaint()
+                    onRunningChanged:  circle.requestPaint()
                 }
 
-                Canvas {
-                    id: ring
+
+                // === Cerchio GPU (Shapes) ===
+                /*
+                CircleProgress {
+                    id: circle
                     anchors.centerIn: parent
                     width: parent.size
                     height: parent.size
 
+                    progress: (homePage.maxSeconds > 0) ? (homePage.timeLeft / homePage.maxSeconds) : 0
+                    running: homePage.running
+                    thickness: 18
+                    pad: 3
+                    baseColor: "#1f2a33"
+                    progressColor: homePage.running ? "#2A9D8F" : "#496a63"
+                    innerColor: "#121b22"
+                    startAngle: -90
+                }
+                */
+                Canvas {
+                    id: circle
+                    anchors.centerIn: parent
+                    width: parent.size
+                    height: parent.size
+
+                    // Ottimizzazioni: GPU + thread separato
+                    renderTarget: Canvas.FramebufferObject
+                    renderStrategy: Canvas.Threaded
+
                     // === parametri esposti per riuso ===
                     property real lw: 18
                     property real pad: 3
-                    property real radius: Math.min(width, height)/2 - (lw/2) - pad
+                    property real radius: Math.min(width, height) / 2 - (lw / 2) - pad
                     property real innerSize: Math.max(0, (radius - lw) * 2)
 
                     onPaint: {
-                        var ctx = getContext("2d");
-                        var w = width, h = height, cx = w/2, cy = h/2;
-                        ctx.clearRect(0,0,w,h);
+                        var ctx = getContext("2d")
+                        var w = width, h = height, cx = w / 2, cy = h / 2
+                        ctx.clearRect(0, 0, w, h)
 
                         // base
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius, 0, Math.PI*2, false);
-                        ctx.lineWidth = lw;
-                        ctx.strokeStyle = "#1f2a33";
-                        ctx.stroke();
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, radius, 0, Math.PI * 2, false)
+                        ctx.lineWidth = lw
+                        ctx.strokeStyle = "#1f2a33"
+                        ctx.stroke()
 
                         // progresso
-                        var frac = (root.maxSeconds > 0) ? (root.timeLeft/root.maxSeconds) : 0;
-                        var end = -Math.PI/2 + frac * Math.PI*2;
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius, -Math.PI/2, end, false);
-                        ctx.lineWidth = lw;
-                        ctx.lineCap = "round";
-                        ctx.strokeStyle = root.running ? "#2A9D8F" : "#496a63";
-                        ctx.stroke();
+                        var frac = (homePage.maxSeconds > 0) ? (homePage.timeLeft / homePage.maxSeconds) : 0
+                        var end = -Math.PI / 2 + frac * Math.PI * 2
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, radius, -Math.PI / 2, end, false)
+                        ctx.lineWidth = lw
+                        ctx.lineCap = "round"
+                        ctx.strokeStyle = homePage.running ? "#2A9D8F" : "#496a63"
+                        ctx.stroke()
 
                         // disco interno
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius - lw, 0, Math.PI*2, false);
-                        ctx.fillStyle = "#121b22";
-                        ctx.fill();
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, radius - lw, 0, Math.PI * 2, false)
+                        ctx.fillStyle = "#121b22"
+                        ctx.fill()
                     }
                     Component.onCompleted: requestPaint()
                 }
 
-                //// Contenitore per testo centrato nel disco interno
+                // Contenitore per testo centrato nel disco interno
                 Item {
                     id: innerTextBox
-                    width: ring.innerSize
-                    height: ring.innerSize
-                    anchors.centerIn: ring
+                    width: circle.innerSize
+                    height: circle.innerSize
+                    anchors.centerIn: circle
 
                     Column {
                         id: textCol
                         anchors.centerIn: parent
-                        spacing: Math.round(ring.innerSize * 0.05)
+                        spacing: Math.round(circle.innerSize * 0.05)
 
                         Text {
-                            text: currentTotal + " " + root.currency
+                            text: currentTotal + " " + homePage.currency
                             color: "white"
-                            font.pixelSize: Math.round(ring.innerSize * 0.22)
+                            font.pixelSize: Math.round(circle.innerSize * 0.22)
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
@@ -221,9 +343,9 @@ Page {
                         }
 
                         Text {
-                            text: qsTr("Tempo rimanente: ") + Math.ceil(root.timeLeft)
+                            text: qsTr("Tempo rimanente: ") + Math.ceil(homePage.timeLeft)
                             color: "#9fb3c4"
-                            font.pixelSize: Math.round(ring.innerSize * 0.10)
+                            font.pixelSize: Math.round(circle.innerSize * 0.10)
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             width: innerTextBox.width
@@ -245,38 +367,38 @@ Page {
                     anchors.margins: 10
                     spacing: 6
 
-                    Label { text: qsTr("Puntate"); font.bold:true; color: "#b5c9d8"; font.pixelSize: 16 }
+                    Label { text: qsTr("Puntate"); font.bold: true; color: "#b5c9d8"; font.pixelSize: 16 }
 
                     ListView {
                         id: bids
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         model: bidsModel
-                        // Mostra la più recente in alto: se il C++ inserisce in coda, inverti con preferredHighlightBegin/End
-                        // oppure fai gestire l'ordine nel C++ (consigliato).
+
                         delegate: Rectangle {
                             width: ListView.view.width
                             height: 40
                             color: "transparent"
 
                             function formatTs(ts) {
-                                var d = new Date(ts)   // ts in ms epoch
+                                var d = new Date(ts) // ts in ms epoch o ISO
                                 function pad(n) { return (n < 10 ? "0" : "") + n }
+                                if (!d || isNaN(d.getTime())) return "--:--:--"
                                 return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds())
                             }
+
                             Row {
                                 anchors.fill: parent
                                 anchors.margins: 6
                                 spacing: 8
                                 Label {
-                                    // timestamp: supporto ms epoch o stringa ISO
                                     text: formatTs(timestamp)
                                     color: "#9fb3c4"
                                     width: 110
                                     elide: Text.ElideRight
                                 }
                                 Label {
-                                    text: "+" + delta + " " + root.currency
+                                    text: "+" + amount + " " + homePage.currency
                                     color: "#2ecc71"
                                     width: 80
                                 }
@@ -287,65 +409,34 @@ Page {
                                     elide: Text.ElideRight
                                 }
                             }
-                            Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 1; color: "#1f2a33" }
-                        }
 
-                        function formatTs(ts) {
-                            var d = null
-                            if (typeof ts === "number") d = new Date(ts)
-                            else if (typeof ts === "string") d = new Date(ts)
-                            if (!d || isNaN(d.getTime())) return "--:--:--"
-                            function pad(n){ return (n<10?"0":"")+n }
-                            return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds())
+                            Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 1; color: "#1f2a33" }
                         }
                     }
                 }
             }
         }
 
-        // START in basso al centro
+        // START/PAUSA in basso al centro
         Row {
             Layout.fillWidth: true
             spacing: 0
             anchors.margins: 0
             Item { Layout.fillWidth: true }
-            Button {
-                id: startBtn
-                text: root.running ? qsTr("In pausa") : qsTr("Start")
-                implicitWidth: 180; implicitHeight: 46
-                font.bold: true
+
+            CustomButton {
+                buttonText: homePage.running ? qsTr("Pausa") : qsTr("Start")
+                buttonWidth: 264
                 onClicked: {
-                    if (!root.running) {
-                        // (ri)parte sempre da 5s
-                        root.timeLeft = root.maxSeconds
-                        pulse.start()
-                        root.running = true
-                        root.roundStarted(root.playerName)
+                    if (!homePage.running) {
+                        // (ri)parte dal valore attuale (se vuoi sempre da maxSeconds, passa true a startCountdown)
+                        startCountdown(homePage.timeLeft <= 0 || homePage.timeLeft > homePage.maxSeconds ? true : false)
                     } else {
-                        root.running = false
+                        pauseCountdown()
                     }
                 }
-                contentItem: Text { anchors.centerIn: parent; text: startBtn.text; color: "white"; font.pixelSize: 16; font.bold: true }
-                background: Rectangle {
-                    id: bg
-                    anchors.fill: parent
-                    radius: height/2
-                    color: startBtn.enabled ? (startBtn.hovered ? "#35bfa3" : "#2A9D8F") : "#335a54"
-                    border.color: "#20816f"; border.width: 1
-                    layer.enabled: true
-                    layer.effect: DropShadow {
-                        anchors.fill: bg; source: bg
-                        horizontalOffset: 0
-                        verticalOffset: startBtn.hovered ? 6 : 4
-                        radius: startBtn.hovered ? 18 : 12
-                        samples: 32
-                        color: "#55000000"
-                    }
-                }
-                MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    onPressed: startBtn.scale = 0.96; onReleased: startBtn.scale = 1.0 }
-                Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
             }
+
             Item { Layout.fillWidth: true }
         }
     }
