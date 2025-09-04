@@ -8,7 +8,9 @@ Popup {
     modal: true
     focus: true
     dim: true
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    closePolicy: Popup.NoAutoClose
+
+    signal newRoundClicked
 
     width: Math.min(420, parent.width - 40)
     height: 280
@@ -26,11 +28,27 @@ Popup {
         anchors.margins: 18
         spacing: 12
 
-        Label { text: qsTr("🟢 Asta conclusa"); color: "white"; font.pixelSize: 20; font.bold: true }
+        //Label { text: qsTr("🟢 Asta conclusa"); color: "white"; font.pixelSize: 20; font.bold: true }
+        Row {
+            spacing: 6
+            Rectangle {
+                width: 24; height: 24
+                radius: width / 2
+                color: "limegreen"   // o "#00FF00"
+            }
+            Label {
+                text: qsTr("Asta conclusa")
+                color: "white"
+                font.pixelSize: 20
+                font.bold: true
+            }
+        }
 
         // Riepilogo
         Column {
             spacing: 6
+
+
             Label {
                 text: qsTr("Vincitore: ") + lastWho
                 color: "#b5c9d8"; font.pixelSize: 16
@@ -82,10 +100,8 @@ Popup {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
+                        newRoundClicked()
                         winPopup.close()
-                        timeLeft = maxSeconds
-                        running = true
-                        pulse.start()
                     }
                 }
             }

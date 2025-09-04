@@ -4,13 +4,15 @@ import QtGraphicalEffects 1.12
 
 Button {
     property string buttonText: ""
+    property bool buttonEnabled: true
+    property int buttonWidth: 160
     signal clicked()
 
     id: startBtn
     text: buttonText
-    implicitWidth: 160
+    implicitWidth: buttonWidth
     implicitHeight: 44
-    enabled: peopleCount > 0
+    enabled: buttonEnabled
     font.bold: true
 
     // Contenuto del bottone → centrato

@@ -12,6 +12,8 @@ Rectangle {
     property url avatarModel: ""
     property color accentColorModel: "#7FD1FF"
 
+    property bool hasPhoto: avatarModel.toString() !== ""
+
     radius: 10
     color: "#141e26"
     border.color: "#22323f"
@@ -19,6 +21,79 @@ Rectangle {
     clip: true
 
     // avatarModel tondo
+    // Avatar circolare
+    Item {
+        id: avatarContainer
+        Layout.alignment: Qt.AlignHCenter
+        width: 96; height: 96
+
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.top: parent.top
+        anchors.topMargin: 12
+
+        // Componi iniziali dinamiche
+        property string initials: {
+            var n = firstNameModel
+            var s = lastNameModel
+            var ini = ""
+            if (n && n.length > 0)
+                ini += n.charAt(0).toUpperCase()
+            if (s && s.length > 0)
+                ini += s.charAt(0).toUpperCase()
+            return ini
+        }
+
+        // L'immagine originale (nascosta): serve come sorgente della maschera
+        Image {
+            id: avatarImage
+            anchors.fill: parent
+            source:  avatarModel
+            fillMode: Image.PreserveAspectCrop
+            visible: false              // non disegnare direttamente
+            cache: false
+        }
+
+        // Maschera circolare
+        Rectangle {
+            id: circleMask
+            anchors.fill: parent
+            radius: width / 2
+            visible: false              // è solo una sorgente per la maschera
+        }
+
+        // Effetto di maschera: qui avviene il vero crop circolare
+        OpacityMask {
+            id: maskedAvatar
+            anchors.fill: parent
+            source: avatarImage
+            maskSource: circleMask
+            visible: hasPhoto
+            antialiasing: true
+        }
+
+        // Sfondo scuro e bordo (sotto al maskedAvatar per avere un anello pulito)
+        Rectangle {
+            anchors.fill: parent
+            radius: width / 2
+            color: "#12202b"
+            border.color: "#2b3b48"
+            border.width: 1
+            z: -1
+        }
+
+        // Placeholder (opzionale) quando non c'è foto
+        Label {
+            anchors.centerIn: parent
+            visible: !hasPhoto
+            text: avatarContainer.initials
+            color: "white"
+            font.pixelSize: 40
+            font.bold: true
+        }
+
+    }
+    /*
     Rectangle {
         id: avatarModelHolder
         width: 52; height: 52
@@ -42,6 +117,7 @@ Rectangle {
             anchors.centerIn: parent
         }
 
+
         // Fallback iniziali se immagine mancante/non caricata
         Text {
             anchors.centerIn: parent
@@ -52,14 +128,15 @@ Rectangle {
             font.pixelSize: 18
         }
     }
+    */
 
     // Blocco testo a destra con larghezza corretta
     Column {
-        anchors.left: avatarModelHolder.right
+        anchors.left: avatarContainer.right
         anchors.leftMargin: 10
         anchors.right: parent.right         // <-- dà width al Column
         anchors.rightMargin: 12
-        anchors.verticalCenter: avatarModelHolder.verticalCenter
+        anchors.verticalCenter: avatarContainer.verticalCenter
         spacing: 8
 
         // Sfondo bianco dietro al nome

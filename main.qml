@@ -10,7 +10,7 @@ ApplicationWindow {
     id: win
     visible: true
     width: 640; height: 480
-    title: qsTr("Fanta App")
+    title: qsTr("FantaBet App")
 
     StackView {
         id: rootStack
@@ -50,16 +50,61 @@ ApplicationWindow {
             title: qsTr("Master")
             header: ToolBar {
                 visible: masterStack.depth > 1
+                background: Rectangle {
+                    color: "#0f1921"
+                    border.color: "#22323f"
+                }
+
                 RowLayout {
                     anchors.fill: parent
+                    spacing: 0
+
+                    // Pulsante indietro
                     ToolButton {
+                        Layout.preferredWidth: 44
                         text: "\u25C0"
+                        font.pixelSize: 20
+                        contentItem: Label {
+                            text: "\u25C0"
+                            color: "white"             // bianco di default
+                            font.pixelSize: 20
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        background: Rectangle {
+                            radius: 8
+                            color: "transparent"
+                            border.color: "transparent"
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                acceptedButtons: Qt.NoButton
+                                cursorShape: Qt.PointingHandCursor   // mano al passaggio
+                                onEntered: parent.color = "#1f2a33" // highlight scuro
+                                onExited: parent.color = "transparent"
+                            }
+                        }
+
                         onClicked: masterStack.pop()
                     }
-                    Label { text: qsTr("Master"); Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
-                    Item { width: 40 } // spacer simmetrico
+
+                    // Titolo centrato
+                    Label {
+                        text: qsTr("Master")
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        color: "white"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    // Spacer simmetrico
+                    Item { Layout.preferredWidth: 44 }
                 }
             }
+
             StackView {
                 id: masterStack
                 anchors.fill: parent
@@ -74,21 +119,65 @@ ApplicationWindow {
         Page {
             title: qsTr("Scommettitore")
             header: ToolBar {
-                visible: slaveStack.depth > 1
+                visible: false //slaveStack.depth > 1
+                background: Rectangle {
+                    color: "#0f1921"
+                    border.color: "#22323f"
+                }
+
                 RowLayout {
                     anchors.fill: parent
+                    spacing: 0
+
+                    // Pulsante indietro
                     ToolButton {
+                        Layout.preferredWidth: 44
                         text: "\u25C0"
+                        font.pixelSize: 20
+                        contentItem: Label {
+                            text: "\u25C0"
+                            color: "white"             // bianco di default
+                            font.pixelSize: 20
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        background: Rectangle {
+                            radius: 8
+                            color: "transparent"
+                            border.color: "transparent"
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                acceptedButtons: Qt.NoButton
+                                cursorShape: Qt.PointingHandCursor   // mano al passaggio
+                                onEntered: parent.color = "#1f2a33" // highlight scuro
+                                onExited: parent.color = "transparent"
+                            }
+                        }
+
                         onClicked: slaveStack.pop()
                     }
-                    Label { text: qsTr("Scommettitore"); Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
-                    Item { width: 40 }
+
+                    // Titolo centrato
+                    Label {
+                        text: qsTr("Scommettitore")
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        color: "white"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    // Spacer simmetrico
+                    Item { Layout.preferredWidth: 44 }
                 }
             }
             StackView {
                 id: slaveStack
                 anchors.fill: parent
-                initialItem: SlaveHowAreYouPage {}       // la tua pagina iniziale del flusso slave
+                initialItem: SlaveAddPersonPage {}       // la tua pagina iniziale del flusso slave
             }
         }
     }
