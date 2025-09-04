@@ -140,6 +140,41 @@ int PlayerModel::append(const QString& firstName,
     return row;
 }
 
+int PlayerModel::appendMimimal(const QString &firstName, const QString &lastName, const QString &avatar, int unique_id)
+{
+    const QVariant accentColorVar;
+    const QVariant accentHueVar = m_items.count() == 0 ? 0.0 : (m_items.count())*0.12;
+    Player p;
+    p.unique_id = unique_id;
+    p.firstName = firstName;
+    p.lastName  = lastName;
+    p.avatar    = avatar;
+
+    if (accentHueVar.isValid()) {
+        bool ok = false;
+        double h = accentHueVar.toDouble(&ok);
+        if (ok) {
+            if (h < 0.0) h = 0.0;
+            if (h > 1.0) h = std::fmod(h, 1.0);
+            p.accentHue = h;
+        }
+    }
+
+    if (accentColorVar.isValid()) {
+        QColor c = accentColorVar.canConvert<QColor>() ? accentColorVar.value<QColor>()
+                                                       : QColor(accentColorVar.toString());
+        if (c.isValid())
+            p.accentColor = c;
+    }
+
+    const int row = m_items.size();
+    beginInsertRows(QModelIndex(), row, row);
+    m_items.push_back(p);
+    endInsertRows();
+    emit countChanged();
+    return row;
+}
+
 void PlayerModel::clear()
 {
     if (m_items.isEmpty()) return;
@@ -179,6 +214,15 @@ bool PlayerModel::setAccentHue(int row, double hue01)
     const QModelIndex idx = index(row);
     emit dataChanged(idx, idx, { AccentHueRole, AccentColorRole });
     return true;
+}
+
+Player *PlayerModel::getPlayerFromUniqueId(int who)
+{
+    for (Player &p : m_items) {
+        if (p.unique_id == who)
+            return &p;
+    }
+    return nullptr;
 }
 
 QColor PlayerModel::colorFromHue(double h) const

@@ -2,11 +2,14 @@
 #define BIDSMODEL_H
 
 
+#include "playermodel.h"
+
 #include <QAbstractListModel>
 #include <QColor>
 #include <QDateTime>
 #include <QTimer>
 #include <QVector>
+#include <QDebug>
 
 class BidsModel : public QAbstractListModel
 {
@@ -16,13 +19,14 @@ class BidsModel : public QAbstractListModel
     Q_PROPERTY(int demoIntervalMs READ demoIntervalMs WRITE setDemoIntervalMs NOTIFY demoIntervalMsChanged)
 
 public:
-    explicit BidsModel(QObject* parent = nullptr);
+    explicit BidsModel(PlayerModel * people);
     ~BidsModel() override = default;
 
     enum Roles {
         TimestampRole = Qt::UserRole + 1, // qint64 ms since epoch
         DeltaRole,                        // int/double
         WhoRole,                          // QString
+        WhoImage,
         TotalRole                         // int totale dopo la puntata
     };
     Q_ENUM(Roles)
@@ -34,9 +38,7 @@ public:
     Qt::ItemFlags flags(const QModelIndex& index) const override;
 
     // API QML
-    Q_INVOKABLE int appendBid(const QString& who,
-                              int delta,
-                              qint64 timestampMs = -1);  // -1 => now
+    Q_INVOKABLE int appendBid(int who, int delta, qint64 timestampMs = -1);
     Q_INVOKABLE void clear();
     Q_INVOKABLE QVariantMap get(int row) const;
 
@@ -57,10 +59,12 @@ private slots:
 private:
     struct Bid {
         qint64  timestampMs = 0;
-        int     delta       = 0;
-        QString who;
+        int     amount       = 0;
+        Player  who;
         int     totalAfter  = 0;   // totale DOPO aver applicato delta
     };
+
+    PlayerModel *people = nullptr;
 
     int currentTotal() const { return m_total; }
 
@@ -70,6 +74,8 @@ private:
     QTimer m_demoTimer;
     QString randomName() const;
     int randomDelta() const;
+
+    Player * getPlayerFromUniqueId(int who);
 };
 
 #endif // BIDSMODEL_H

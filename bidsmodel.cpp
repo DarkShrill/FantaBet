@@ -2,17 +2,19 @@
 #include <QtGlobal>
 #include <QRandomGenerator>
 
-BidsModel::BidsModel(QObject* parent)
-    : QAbstractListModel(parent)
+BidsModel::BidsModel(PlayerModel *people)
 {
+    this->people = people;
+
+
     // Timer demo: ogni 5 secondi aggiunge una puntata random
     m_demoTimer.setInterval(1000);
     connect(&m_demoTimer, &QTimer::timeout, this, &BidsModel::addRandomBid);
 
     // Avvio demo di default (disattiva se non vuoi)
-    m_demoTimer.start();
-    emit demoEnabledChanged();
-    emit demoIntervalMsChanged();
+//    m_demoTimer.start();
+//    emit demoEnabledChanged();
+//    emit demoIntervalMsChanged();
 }
 
 int BidsModel::rowCount(const QModelIndex& parent) const
@@ -29,8 +31,9 @@ QVariant BidsModel::data(const QModelIndex& index, int role) const
     const Bid& b = m_items.at(index.row());
     switch (role) {
     case TimestampRole: return b.timestampMs;
-    case DeltaRole:     return b.delta;
-    case WhoRole:       return b.who;
+    case DeltaRole:     return b.amount;
+    case WhoRole:       return b.who.firstName + " " + b.who.lastName;
+    case WhoImage:      return b.who.avatar;
     case TotalRole:     return b.totalAfter;
     default:            return {};
     }
@@ -40,8 +43,9 @@ QHash<int, QByteArray> BidsModel::roleNames() const
 {
     return {
         { TimestampRole, "timestamp" },
-        { DeltaRole,     "delta"     },
+        { DeltaRole,     "amount"    },
         { WhoRole,       "who"       },
+        { WhoImage,      "photo"     },
         { TotalRole,     "total"     }
     };
 }
@@ -52,15 +56,21 @@ Qt::ItemFlags BidsModel::flags(const QModelIndex& index) const
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
 }
 
-int BidsModel::appendBid(const QString& who, int delta, qint64 timestampMs)
+int BidsModel::appendBid(int who, int delta, qint64 timestampMs)
 {
     if (timestampMs < 0)
         timestampMs = QDateTime::currentMSecsSinceEpoch();
 
+    Player* pl = people->getPlayerFromUniqueId(who);
+    if (!pl) {
+        qWarning() << "[BidsModel] Player id" << who << "non trovato";
+        return -1;
+    }
+
     Bid b;
     b.timestampMs = timestampMs;
-    b.delta       = delta;
-    b.who         = who;
+    b.amount      = delta;
+    b.who         = *pl;
     b.totalAfter  = m_total + delta;
 
     // Inseriamo in TESTA (riga 0) per avere il più recente in alto
@@ -91,8 +101,9 @@ QVariantMap BidsModel::get(int row) const
     if (row < 0 || row >= m_items.size()) return m;
     const Bid& b = m_items.at(row);
     m.insert("timestamp", b.timestampMs);
-    m.insert("delta",     b.delta);
-    m.insert("who",       b.who);
+    m.insert("delta",     b.amount);
+    m.insert("who",       b.who.firstName + " " + b.who.lastName);
+    m.insert("photo",     b.who.avatar);
     m.insert("total",     b.totalAfter);
     return m;
 }
@@ -116,13 +127,13 @@ void BidsModel::setDemoIntervalMs(int ms)
 
 void BidsModel::addRandomBid()
 {
-    const QString who = randomName();
-    const int delta   = randomDelta();
-    appendBid(who, delta, QDateTime::currentMSecsSinceEpoch());
+//    const QString who = randomName();
+//    const int delta   = randomDelta();
+//    appendBid(who, delta, QDateTime::currentMSecsSinceEpoch());
 
-    if(m_items.size() > 3){
-        setDemoEnabled(false);
-    }
+//    if(m_items.size() > 3){
+//        setDemoEnabled(false);
+//    }
 }
 
 QString BidsModel::randomName() const
@@ -154,4 +165,9 @@ int BidsModel::randomDelta() const
     int k = qrand() % (int(sizeof(deltas)/sizeof(deltas[0])));
 #endif
     return deltas[k];
+}
+
+Player *BidsModel::getPlayerFromUniqueId(int who)
+{
+    return people->getPlayerFromUniqueId(who);
 }
