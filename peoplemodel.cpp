@@ -11,6 +11,7 @@ PeopleModel::PeopleModel(QObject* parent)
                  QCoreApplication::organizationName().isEmpty() ? "MyOrg" : QCoreApplication::organizationName(),
                  QCoreApplication::applicationName().isEmpty()   ? "MyApp" : QCoreApplication::applicationName())
 {
+    // All'avvio provo subito a ripristinare eventuali nominativi salvati in precedenza.
     load();
 }
 
@@ -49,11 +50,13 @@ QHash<int, QByteArray> PeopleModel::roleNames() const
 
 void PeopleModel::addPerson(const QString& firstName, const QString& lastName, const QString& photo)
 {
+    // Normalizzo i dati in ingresso così evito spazi/valori strani nella lista.
     Person p{ firstName.trimmed(), lastName.trimmed(), photo };
     const int pos = m_items.size();
     beginInsertRows(QModelIndex(), pos, pos);
     m_items.push_back(std::move(p));
     endInsertRows();
+    // Salvo immediatamente per non perdere i nominativi aggiunti a caldo.
     save();
 }
 
@@ -63,6 +66,7 @@ void PeopleModel::removeAt(int row)
     beginRemoveRows(QModelIndex(), row, row);
     m_items.removeAt(row);
     endRemoveRows();
+    // Dopo ogni modifica salvo così non rischio di perdere gli aggiornamenti.
     save();
 }
 
@@ -77,6 +81,7 @@ void PeopleModel::updateAt(int row, const QVariantMap& data)
 
     const QModelIndex idx = index(row);
     emit dataChanged(idx, idx, { FirstNameRole, LastNameRole, FullNameRole, InitialsRole, PhotoRole });
+    // Persisto la modifica così la ritrovo al prossimo avvio.
     save();
 }
 
@@ -86,6 +91,7 @@ void PeopleModel::clearAll()
     beginResetModel();
     m_items.clear();
     endResetModel();
+    // Dopo una pulizia totale salvo subito per tenere allineata anche la persistenza.
     save();
 }
 
@@ -101,6 +107,7 @@ int PeopleModel::indexOfByName(const QString& firstName, const QString& lastName
 void PeopleModel::sortBy(const QString& field, bool ascending)
 {
     if (m_items.size() <= 1) return;
+    // Uso un reset completo perché l'ordine cambia drasticamente e voglio tenere semplice la segnalazione.
     beginResetModel();
     std::sort(m_items.begin(), m_items.end(), [&](const Person& a, const Person& b){
         auto cmp = [&](const QString& x, const QString& y){
@@ -121,6 +128,7 @@ void PeopleModel::sortBy(const QString& field, bool ascending)
 
 void PeopleModel::setPersist(bool p)
 {
+    // Mi serve poterla disattivare quando faccio prove senza inquinare i dati reali.
     if (m_persist == p) return;
     m_persist = p;
     emit persistChanged();
@@ -131,6 +139,7 @@ void PeopleModel::save()
 {
     if (!m_persist) return;
 
+    // Serializzo tutto in JSON compatto così posso riutilizzarlo anche da altri tool.
     QJsonArray arr;
     for (const auto& p : m_items) {
         QJsonObject o;
@@ -158,6 +167,7 @@ QByteArray PeopleModel::toJson() const {
     root["type"] = "people";
     root["count"] = m_items.size();
     root["payload"] = arr;
+    // Questo JSON compatto è lo stesso formato che invio via rete al master.
     return QJsonDocument(root).toJson(QJsonDocument::Compact);
 }
 
@@ -166,12 +176,14 @@ void PeopleModel::load()
     beginResetModel();
     m_items.clear();
 
+    // Recupero il blob JSON salvato: se manca parto da lista vuota.
     const QString json = m_settings.value(QStringLiteral("people/json")).toString();
     if (!json.isEmpty()) {
         const QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8());
         if (doc.isArray()) {
             const QJsonArray arr = doc.array();
             m_items.reserve(arr.size());
+            // Ricostruisco la lista così com'era stata salvata, mantenendo l'ordine originale.
             for (const auto& v : arr) {
                 const QJsonObject o = v.toObject();
                 Person p;
@@ -187,6 +199,7 @@ void PeopleModel::load()
 
 QString PeopleModel::initialsOf(const QString& firstName, const QString& lastName)
 {
+    // Uso solo le iniziali perché in UI ho spesso chip piccoli.
     QString i;
     if (!firstName.isEmpty()) i += firstName.left(1).toUpper();
     if (!lastName.isEmpty())  i += lastName.left(1).toUpper();
@@ -195,6 +208,7 @@ QString PeopleModel::initialsOf(const QString& firstName, const QString& lastNam
 
 QString PeopleModel::fullNameOf(const QString& firstName, const QString& lastName)
 {
+    // Costruisco il nome completo rispettando eventuali campi vuoti.
     const QString fn = firstName.trimmed();
     const QString ln = lastName.trimmed();
     if (fn.isEmpty()) return ln;

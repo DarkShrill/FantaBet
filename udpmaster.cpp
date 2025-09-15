@@ -13,6 +13,7 @@ UdpMaster::UdpMaster(QObject* parent) : QObject(parent) {
     connect(&m_sock, &QUdpSocket::readyRead, this, &UdpMaster::onReadyRead);
     qInfo() << "[MASTER] in ascolto su UDP" << PORT;
 
+    // Aumento un po' i buffer per gestire burst di pacchetti quando arrivano grandi liste di persone.
     m_sock.setSocketOption(QAbstractSocket::SendBufferSizeSocketOption,   4*1024*1024);
     m_sock.setSocketOption(QAbstractSocket::ReceiveBufferSizeSocketOption,4*1024*1024);
 }
@@ -65,6 +66,7 @@ void UdpMaster::onReadyRead() {
 
             QByteArray data = QByteArray::fromBase64(dataB64.toLatin1());
 
+            // Recupero (o creo) lo stato del trasferimento per questo ID.
             auto &t = m_transfers[id];
             if (t.parts.isEmpty()) {
                 t.total = total;
@@ -117,6 +119,7 @@ void UdpMaster::onReadyRead() {
                 // chiedi solo alcuni mancanti per non esagerare (es. max 128 alla volta)
                 if (!missing.isEmpty()) {
                     if (missing.size() > 128) missing.resize(128);
+                    // Chiedo solo i pezzi mancanti così non intaso la rete inutilmente.
                     sendNack(t.lastSender, t.lastPort, id, missing);
                 }
             }
@@ -129,6 +132,7 @@ void UdpMaster::onReadyRead() {
 void UdpMaster::sendNack(const QHostAddress& to, quint16 port,
                          const QString& id, const QVector<int>& missing)
 {
+    // Costruisco il NACK chiedendo solo le sequenze che non ho ricevuto correttamente.
     QJsonArray arr;
     for (int s : missing) arr.push_back(s);
 
@@ -151,6 +155,7 @@ REPEAT:
     if(unique_ids_list.contains(randomNumber)){
         goto REPEAT;
     }
+    // Per ora mi limito a restituire il numero: lo uso come ID temporaneo per lo slave.
     return randomNumber;
 }
 
@@ -160,5 +165,6 @@ void UdpMaster::sendAck(const QHostAddress& to, quint16 port, const QString& for
         ack["unique_id"] = unique_id;
     const QByteArray dat = QJsonDocument(ack).toJson(QJsonDocument::Compact);
     m_sock.writeDatagram(dat, to, port);
+    // Mi piace loggare ogni ACK così posso seguire l'handshake quando debbo debuggare.
     qInfo() << "[MASTER] ACK("<< forType <<") →" << to.toString() << ":" << port;
 }

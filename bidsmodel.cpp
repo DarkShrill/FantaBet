@@ -11,6 +11,8 @@ BidsModel::BidsModel(PlayerModel *people)
     m_demoTimer.setInterval(1000);
     connect(&m_demoTimer, &QTimer::timeout, this, &BidsModel::addRandomBid);
 
+    // Lo lascio pronto ma non lo avvio di default: così posso abilitarlo solo quando serve una demo.
+
     // Avvio demo di default (disattiva se non vuoi)
 //    m_demoTimer.start();
 //    emit demoEnabledChanged();
@@ -61,6 +63,7 @@ int BidsModel::appendBid(int who, int delta, qint64 timestampMs)
     if (timestampMs < 0)
         timestampMs = QDateTime::currentMSecsSinceEpoch();
 
+    // Recupero il giocatore associato: senza di lui non posso loggare la puntata.
     Player* pl = people->getPlayerFromUniqueId(who);
     if (!pl) {
         qWarning() << "[BidsModel] Player id" << who << "non trovato";
@@ -73,7 +76,7 @@ int BidsModel::appendBid(int who, int delta, qint64 timestampMs)
     b.who         = *pl;
     b.totalAfter  = m_total + delta;
 
-    // Inseriamo in TESTA (riga 0) per avere il più recente in alto
+    // Inserisco sempre in testa così la UI mostra subito l'ultimo movimento.
     beginInsertRows(QModelIndex(), 0, 0);
     m_items.prepend(b);
     endInsertRows();
@@ -112,6 +115,7 @@ QVariantMap BidsModel::get(int row) const
 
 void BidsModel::setDemoEnabled(bool on)
 {
+    // Tengo il timer allineato allo stato richiesto così non invio eventi superflui.
     if (on == m_demoTimer.isActive()) return;
     if (on) m_demoTimer.start();
     else    m_demoTimer.stop();
@@ -120,6 +124,7 @@ void BidsModel::setDemoEnabled(bool on)
 
 void BidsModel::setDemoIntervalMs(int ms)
 {
+    // Espongo questo tweak perché durante le prove mi piace accelerare o rallentare la simulazione.
     if (ms <= 0 || ms == m_demoTimer.interval()) return;
     m_demoTimer.setInterval(ms);
     emit demoIntervalMsChanged();
@@ -134,6 +139,7 @@ void BidsModel::addRandomBid()
 //    if(m_items.size() > 3){
 //        setDemoEnabled(false);
 //    }
+    // Per ora tengo questa funzione pronta: quando mi serve una demo mi basta togliere i commenti.
 }
 
 QString BidsModel::randomName() const
@@ -152,6 +158,7 @@ QString BidsModel::randomName() const
     int i = qrand() % first.size();
     int j = qrand() % last.size();
 #endif
+    // Non serve nulla di fancy: unisco nome e cognome casuali per popolare la demo.
     return first.at(i) + " " + last.at(j);
 }
 
@@ -164,6 +171,7 @@ int BidsModel::randomDelta() const
 #else
     int k = qrand() % (int(sizeof(deltas)/sizeof(deltas[0])));
 #endif
+    // Così i rilanci sembrano realistici anche se generati a caso.
     return deltas[k];
 }
 

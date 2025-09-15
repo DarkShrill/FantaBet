@@ -4,6 +4,7 @@
 PlayerModel::PlayerModel(QObject* parent)
     : QAbstractListModel(parent)
 {
+    // Modello vuoto di partenza: preferisco popolarlo esplicitamente da QML o dal master.
 }
 
 int PlayerModel::rowCount(const QModelIndex& parent) const
@@ -28,7 +29,7 @@ QVariant PlayerModel::data(const QModelIndex& index, int role) const
     }
     case AvatarRole:     return p.avatar;
     case AccentColorRole: {
-        // Se non c'è accentColor ma c'è hue, calcola al volo
+        // Se non ho un colore esplicito mi calcolo da solo la tinta (o ne scelgo una fallback).
         QColor c = p.accentColor.isValid()
                    ? p.accentColor
                    : (p.accentHue >= 0.0 ? colorFromHue(p.accentHue)
@@ -115,6 +116,7 @@ int PlayerModel::append(const QString& firstName,
     p.lastName  = lastName;
     p.avatar    = avatar;
 
+    // Mi salvo l'hue se arriva da QML così posso rigenerare il colore in modo coerente.
     if (accentHueVar.isValid()) {
         bool ok = false;
         double h = accentHueVar.toDouble(&ok);
@@ -143,6 +145,7 @@ int PlayerModel::append(const QString& firstName,
 int PlayerModel::appendMimimal(const QString &firstName, const QString &lastName, const QString &avatar, int unique_id)
 {
     const QVariant accentColorVar;
+    // Quando popolo da rete preferisco generare un hue in base alla posizione per colori distinti.
     const QVariant accentHueVar = m_items.count() == 0 ? 0.0 : (m_items.count())*0.12;
     Player p;
     p.unique_id = unique_id;
@@ -218,6 +221,7 @@ bool PlayerModel::setAccentHue(int row, double hue01)
 
 Player *PlayerModel::getPlayerFromUniqueId(int who)
 {
+    // Mi faccio un semplice linear search: per le dimensioni del roster va più che bene.
     for (Player &p : m_items) {
         if (p.unique_id == who)
             return &p;

@@ -7,6 +7,7 @@
 #include <QString>
 #include <QVector>
 
+// Struct compatta per il giocatore: tengo qui tutto quello che mi serve sul lato UI.
 struct Player {
     uint32_t unique_id;
     QString firstName;
@@ -16,6 +17,7 @@ struct Player {
     double  accentHue = -1.0; // <0 = non impostata
 };
 
+// Modello esposto a QML: qui centralizzo la lista dei partecipanti che manipolo da UI.
 class PlayerModel : public QAbstractListModel
 {
     Q_OBJECT
@@ -45,11 +47,13 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     // API comode per QML
+    // Metodo comodo per popolare tutto in un colpo solo quando costruisco il roster.
     Q_INVOKABLE int append(const QString& firstName,
                            const QString& lastName,
                            const QString& avatar = QString(),
                            const QVariant& accentColor = QVariant(),   // QColor o stringa #RRGGBB
                            const QVariant& accentHue = QVariant());    // double 0..1
+    // Variante "minimal" che uso quando il master mi fornisce già l'ID.
     Q_INVOKABLE int appendMimimal(const QString& firstName,
                            const QString& lastName,
                            const QString& avatar = QString(), int unique_id = 0);    // double 0..1
@@ -59,6 +63,7 @@ public:
     Q_INVOKABLE bool setAccentHue(int row, double hue01);              // 0..1
 
 
+    // Utility per gli altri modelli: mi serve un lookup rapido via unique_id.
     Player * getPlayerFromUniqueId(int who);
 signals:
     void countChanged();
