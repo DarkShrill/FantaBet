@@ -23,6 +23,7 @@ Page {
 
     UdpSlave {
         id: slave
+        // Questo è il mio ponte verso il master: lo userò dopo aver scelto nome e foto.
     }
 
     ColumnLayout {

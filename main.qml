@@ -6,12 +6,14 @@ import QtGraphicalEffects 1.12
 import "qrc:/MasterPages/"
 import "qrc:/SlavePages/"
 
+// Entry point dell'app: qui definisco finestra e flussi principali.
 ApplicationWindow {
     id: win
     visible: true
     width: 640; height: 480
     title: qsTr("FantaBet App")
 
+    // Stack principale che mi permette di saltare tra home e flussi specifici.
     StackView {
         id: rootStack
         anchors.fill: parent
@@ -31,12 +33,14 @@ ApplicationWindow {
                     width: 170; height: 190
                     iconSource: "qrc:/worker-money-time.png"
                     label: qsTr("Master")
+                    // Quando clicco qui parte il flow dedicato al banco.
                     onClicked: rootStack.push(masterFlow)
                 }
                 IconButton {
                     width: 170; height: 190
                     iconSource: "qrc:/man-with-money.png"
                     label: qsTr("Scommettitore")
+                    // E questo apre il percorso lato giocatore.
                     onClicked: rootStack.push(slaveFlow)
                 }
             }
@@ -108,6 +112,7 @@ ApplicationWindow {
             StackView {
                 id: masterStack
                 anchors.fill: parent
+                // Parto sempre dalla waiting room: da lì controllo il resto della partita.
                 initialItem: MasterWaitingRoomPage {}   // la tua pagina iniziale del flusso master
             }
         }
@@ -177,6 +182,7 @@ ApplicationWindow {
             StackView {
                 id: slaveStack
                 anchors.fill: parent
+                // Sul lato giocatore parto dalla pagina di registrazione persona.
                 initialItem: SlaveAddPersonPage {}       // la tua pagina iniziale del flusso slave
             }
         }

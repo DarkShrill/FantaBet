@@ -9,6 +9,7 @@
 #include <QElapsedTimer>
 #include <QRandomGenerator>
 
+// Ogni trasferimento "people" multi-pacchetto lo traccio qui per gestire ritrasmissioni e ack.
 struct PendingTransfer {
     int total = 0;
     int received = 0;
@@ -18,6 +19,7 @@ struct PendingTransfer {
     quint16      lastPort = 0;
 };
 
+// Questo oggetto vive nel master e gestisce la comunicazione UDP con gli slave.
 class UdpMaster : public QObject {
     Q_OBJECT
 public:
@@ -39,7 +41,9 @@ private:
     void sendNack(const QHostAddress& to, quint16 port, const QString& id,
                   const QVector<int>& missing);
     int getRandomNumber();
+    // Mappa dei trasferimenti in corso indicizzati per ID sessione inviato dallo slave.
     QMap<QString, PendingTransfer> m_transfers;
+    // Tengo a portata di mano una lista di ID nel caso volessi gestire duplicati a runtime.
     QVector<int> unique_ids_list;
 
 };
