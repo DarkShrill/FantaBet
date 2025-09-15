@@ -18,6 +18,9 @@ Page {
     property bool    running:    false
     property string  currency:   "€"
 
+    property bool wasRunningBeforeEdit: false
+
+
     // Modello C++ (iniettalo dall’esterno: es. context property "BidsModel")
     property var bidsModel: Bids
 
@@ -86,8 +89,10 @@ Page {
             if (!countdownAnim.paused && homePage.timeLeft <= 0.001) {
                 homePage.running = false
                 winPopup.open()
-                if(lastBid.photo !== ""){
-                    celebration.celebrate(lastBid.photo, 2000)
+                if(lastBid != null){
+                    if(lastBid.photo !== ""){
+                        celebration.celebrate(lastBid.photo, 2000)
+                    }
                 }
                 homePage.roundEnded(homePage.playerName, currentTotal)
             }
@@ -343,12 +348,20 @@ Page {
                         }
 
                         Text {
+                            id: timeLeftText
                             text: qsTr("Tempo rimanente: ") + Math.ceil(homePage.timeLeft)
                             color: "#9fb3c4"
                             font.pixelSize: Math.round(circle.innerSize * 0.10)
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             width: innerTextBox.width
+
+                            // Area di click/doppio click
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onDoubleClicked: homePage.editTime()
+                            }
                         }
                     }
                 }
@@ -439,5 +452,68 @@ Page {
 
             Item { Layout.fillWidth: true }
         }
+    }
+
+
+
+
+
+    Dialog {
+        id: editTimeDialog
+        modal: true
+        focus: true
+        dim: true
+        x: (parent.width - width) / 2
+        y: (parent.height - height) / 2
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        title: qsTr("Modifica tempo rimanente")
+
+        property int newSeconds: Math.max(0, Math.ceil(homePage.timeLeft))
+
+        contentItem: ColumnLayout {
+            anchors.margins: 16
+            spacing: 12
+
+            Label {
+                text: qsTr("Secondi")
+                color: "#b5c9d8"
+                Layout.alignment: Qt.AlignLeft
+            }
+
+            // Usa SpinBox (QtQuick.Controls 2.5)
+            SpinBox {
+                id: secondsSpin
+                from: 0
+                to: 3600
+                value: editTimeDialog.newSeconds
+                editable: true
+                Layout.preferredWidth: 200
+                onValueChanged: editTimeDialog.newSeconds = value
+            }
+        }
+
+        onAccepted: {
+            homePage.timeLeft = editTimeDialog.newSeconds
+            // opzionale: riallinea anche maxSeconds se vuoi che il cerchio si adatti
+            homePage.maxSeconds = editTimeDialog.newSeconds
+
+            if (homePage.wasRunningBeforeEdit) {
+                // riparte dal nuovo valore senza resettare a max
+                startCountdown(true)
+            }
+        }
+        onRejected: {
+            if (homePage.wasRunningBeforeEdit) {
+                resumeCountdown()
+            }
+        }
+    }
+
+
+    function editTime() {
+        wasRunningBeforeEdit = homePage.running
+        if (homePage.running) pauseCountdown()
+        editTimeDialog.newSeconds = Math.max(0, Math.ceil(homePage.timeLeft))
+        editTimeDialog.open()
     }
 }
