@@ -7,6 +7,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QTimer>
+#include <QQmlContext>
 #include <QQmlApplicationEngine>
 #include <QSurfaceFormat>
 
@@ -83,7 +84,13 @@ int main(int argc, char *argv[])
     qmlRegisterType<UdpMaster>("Network", 1, 0, "UdpMaster");
     qmlRegisterType<UdpSlave>("Network", 1, 0, "UdpSlave");
 
+
+
     QQmlApplicationEngine engine;
+
+    const QString appDir = QCoreApplication::applicationDirPath();
+    engine.rootContext()->setContextProperty("AppDir", appDir);
+
     const QUrl url(QStringLiteral("qrc:/main.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
                      &app, [url](QObject *obj, const QUrl &objUrl) {
