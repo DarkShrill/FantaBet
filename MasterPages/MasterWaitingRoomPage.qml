@@ -21,6 +21,7 @@ Page {
         id: master
 
         onPeopleReceived: {
+            // Ogni volta che uno slave si registra lo porto immediatamente nel modello dei player.
             for (var i = 0; i < payload.length; ++i) {
                 var p = payload[i]
                 Players.appendMimimal(p.firstName, p.lastName, p.photo, unique_id)
@@ -48,7 +49,7 @@ Page {
     }
 
     // Sceglie quale model usare
-    readonly property var modelToUse: playersModel ? playersModel : mockModel
+    readonly property var modelToUse: playersModel ? playersModel : mockModel // fallback comodo per test rapidi
     readonly property int peopleCount: modelToUse ? modelToUse.count : 0
 
     ColumnLayout {

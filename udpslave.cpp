@@ -17,6 +17,7 @@ UdpSlave::UdpSlave(QObject* parent) : QObject(parent) {
     m_timer.setInterval(PERIOD_MS);
     connect(&m_timer, &QTimer::timeout, this, &UdpSlave::onTick);
 
+    // Anche qui aumento i buffer per reggere il burst iniziale del trasferimento "people".
     m_sock.setSocketOption(QAbstractSocket::SendBufferSizeSocketOption,   4*1024*1024);
     m_sock.setSocketOption(QAbstractSocket::ReceiveBufferSizeSocketOption,4*1024*1024);
 }
@@ -52,6 +53,7 @@ void UdpSlave::start(QString name, QString lastname, QUrl image)
                            : image.toString(); // gestisce anche qrc:/...
         QImage img(path);
         if (!img.isNull()) {
+            // Converto la foto in data URL così posso incapsularla nel JSON senza passaggi extra.
             photoDataUrl = qimageToDataUrl(img, "PNG");
         }
     }
@@ -68,10 +70,12 @@ void UdpSlave::start(QString name, QString lastname, QUrl image)
     root["count"] = 1;
     root["payload"] = arr;
 
+    // Mi salvo il JSON completo: lo userò quando scatterà il burst verso il master.
     data_to_send = QJsonDocument(root).toJson(QJsonDocument::Compact);
 
 
     m_timer.start();
+    // Inizio subito il ciclo di discover: appena trovo il master passo all'invio dati.
     sendFind();
 }
 
@@ -96,6 +100,7 @@ void UdpSlave::sendBid(int amount)
     }
 
     m_sock.writeDatagram(dat, m_masterAddr, PORT);
+    // Mi piace loggare anche qui per avere una traccia delle puntate inviate.
     qInfo() << "[SLAVE] BID inviato:" << dat;
 }
 
@@ -107,6 +112,7 @@ void UdpSlave::sendFind() {
     QJsonObject obj; obj["type"]="find";
     const QByteArray dat = QJsonDocument(obj).toJson(QJsonDocument::Compact);
 
+    // Cerco tutte le interfacce attive così da inviare il discover solo dove ha senso.
     bool okAny = false;
     for (const QNetworkInterface& ifc : QNetworkInterface::allInterfaces()) {
         if (!(ifc.flags() & QNetworkInterface::IsUp) ||
@@ -122,6 +128,7 @@ void UdpSlave::sendFind() {
         }
     }
     if (!okAny) {
+        // In caso di interfacce "strane" faccio comunque un broadcast generico.
         m_sock.writeDatagram(dat, QHostAddress::Broadcast, PORT);
     }
     m_waitingAckFind = true;
@@ -144,6 +151,7 @@ void UdpSlave::onReadyRead() {
             const bool ok = obj.value("ok").toBool();
 
             if (forType == "find" && ok && !m_waitingAckPeople) {
+                // Appena il master risponde al find memorizzo l'indirizzo e mi preparo a spedire i dati.
                 m_masterAddr = sender;
                 m_masterPort = sport;
                 m_waitingAckFind = false;
@@ -157,6 +165,7 @@ void UdpSlave::onReadyRead() {
                 this->unique_id = obj.value("unique_id").toInt();
 
                 emit sentPeople();
+                // Ora che ho l'ID assegnato posso procedere con i bid veri e propri.
                 qInfo() << "[SLAVE] ACK(PEOPLE) ricevuto " << unique_id;
             }
         }else if (type == "nack") {
@@ -182,7 +191,7 @@ void UdpSlave::sendPeople() {
     m_out.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
     // ATTENZIONE: Base64 aumenta del ~33%. Tieni chunk **piccoli** (es. 900 byte raw)
-    const int chunkSize = 900;
+    const int chunkSize = 900; // tengo i pacchetti piccoli per non frammentarli a livello UDP.
     const int size = data_to_send.size();
     const int total = (size % chunkSize == 0) ? (size / chunkSize)
                                               : (size / chunkSize + 1);
@@ -208,14 +217,15 @@ void UdpSlave::sendPeople() {
     qDebug() << "m_out.datagrams: " << m_out.datagrams.size();
 
     // pacing: invia a burst (es. 64 datagrammi ogni 10 ms)
+    // Uso un lambda qui così posso controllare facilmente quanti datagrammi inviare per ciclo.
     connect(&m_burstTimer, &QTimer::timeout, this, [this](){
-        const int burst = 16;
+        const int burst = 16; // numero che mi è sembrato un buon compromesso dopo qualche prova.
         int sent = 0;
         while (m_out.nextToSend < m_out.datagrams.size() && sent < burst) {
             const QByteArray& d = m_out.datagrams[m_out.nextToSend];
             const qint64 n = m_sock.writeDatagram(d, m_masterAddr, PORT);
             if (n < 0) {
-                // buffer pieno → fermati ora, riproverai al prossimo tick
+                // Se il buffer è pieno mi fermo: riproverò al prossimo tick senza stressare il socket.
                 // qWarning() << "writeDatagram failed:" << m_sock.errorString();
                 break;
             }
@@ -224,6 +234,7 @@ void UdpSlave::sendPeople() {
         }
         if (m_out.nextToSend >= m_out.datagrams.size()) {
             m_burstTimer.stop();
+            // Da questo momento attendo solo la conferma dal master per sapere se ha ricevuto tutto.
             m_waitingAckPeople = true;
             qInfo() << "[SLAVE] PEOPLE inviato in" << m_out.datagrams.size()
                     << "parti, totalSize=" << data_to_send.size();

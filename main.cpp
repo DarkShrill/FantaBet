@@ -1,3 +1,4 @@
+// Mi annoto gli include principali così da ricordarmi al volo chi sto esponendo in QML.
 #include "bidsmodel.h"
 #include "peoplemodel.h"
 #include "playermodel.h"
@@ -14,6 +15,7 @@ static PlayerModel * model = nullptr;
 static BidsModel * g_bids = nullptr;
 static PeopleModel * p_model = nullptr;
 
+// Singleton per le persone: mi piace centralizzare tutto qui per non duplicare istanze.
 static QObject* Get_PeopleModelProvider(QQmlEngine* engine, QJSEngine* scriptEngine) {
     Q_UNUSED(engine)
     Q_UNUSED(scriptEngine)
@@ -39,6 +41,7 @@ static QObject* Get_PlayersSingleton(QQmlEngine* engine, QJSEngine* scriptEngine
     return model;
 }
 
+// E mi salvo anche i bids nello stesso stile, così QML li usa sempre sincronizzati con i player.
 static QObject* Get_BidsProvider(QQmlEngine* engine, QJSEngine* scriptEngine)
 {
     Q_UNUSED(engine)
@@ -83,6 +86,7 @@ int main(int argc, char *argv[])
     qmlRegisterType<UdpMaster>("Network", 1, 0, "UdpMaster");
     qmlRegisterType<UdpSlave>("Network", 1, 0, "UdpSlave");
 
+    // Engine QML principale: qui carico tutto il mondo dell'interfaccia.
     QQmlApplicationEngine engine;
     const QUrl url(QStringLiteral("qrc:/main.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
